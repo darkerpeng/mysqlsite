@@ -15,8 +15,13 @@ const PREFIX_TO_DOMAIN = {
   "~edu": "education.github.com",
   "~lfs": "git-lfs.github.com",
   "~fastly": "github.global.ssl.fastly.net",
-  "~usercontent": "githubusercontent.com",
-  "~pages": "github.io",
+  "~user-images": "user-images.githubusercontent.com",
+  "~camo": "camo.githubusercontent.com",
+  "~cloud": "cloud.githubusercontent.com",
+  "~repo-images": "repository-images.githubusercontent.com",
+  "~media": "media.githubusercontent.com",
+  "~private-images": "private-user-images.githubusercontent.com",
+
   "~security": "securitylab.github.com",
 };
 
