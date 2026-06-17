@@ -1,4 +1,4 @@
-export const config = { runtime: "edge" };
+export const config = { runtime: "edge", maxDuration: 30 };
 
 const PREFIX_TO_DOMAIN = {
   "~raw": "raw.githubusercontent.com",
@@ -8,10 +8,16 @@ const PREFIX_TO_DOMAIN = {
   "~objects": "objects.githubusercontent.com",
   "~avatars": "avatars.githubusercontent.com",
   "~assets": "github.githubassets.com",
+  "~assets-cdn": "assets-cdn.github.com",
   "~gist-raw": "gist.githubusercontent.com",
   "~collector": "collector.github.com",
   "~alive": "alive.github.com",
   "~edu": "education.github.com",
+  "~lfs": "git-lfs.github.com",
+  "~fastly": "github.global.ssl.fastly.net",
+  "~usercontent": "githubusercontent.com",
+  "~pages": "github.io",
+  "~security": "securitylab.github.com",
 };
 
 const DOMAIN_TO_PREFIX = {};
@@ -53,11 +59,20 @@ const SKIP_RES_HEADERS = new Set([
   "keep-alive",
   "x-frame-options",
   "content-security-policy",
+  "content-security-policy-report-only",
   "strict-transport-security",
   "x-content-type-options",
 ]);
 
+const STATIC_PREFIXES = ["~assets", "~avatars", "~fastly", "~assets-cdn"];
+
 function parseTarget(pathname) {
+  pathname = pathname
+    .replace(
+      /(\/[^/]+\/[^/]+\/(?:latest-commit|tree-commit-info)\/[^/]+)\/https?(?:%3A|:)\/\/[^/]+\/.*/,
+      "$1"
+    );
+
   const segments = pathname.split("/");
   const first = segments[1] || "";
 
@@ -65,10 +80,11 @@ function parseTarget(pathname) {
     return {
       domain: PREFIX_TO_DOMAIN[first],
       path: "/" + segments.slice(2).join("/"),
+      prefix: first,
     };
   }
 
-  return { domain: "github.com", path: pathname };
+  return { domain: "github.com", path: pathname, prefix: "" };
 }
 
 function rewriteUrls(text, proxyOrigin) {
@@ -153,7 +169,7 @@ export default async function handler(req) {
 
   const reqUrl = new URL(req.url);
   const proxyOrigin = `${reqUrl.protocol}//${reqUrl.host}`;
-  const { domain, path } = parseTarget(reqUrl.pathname);
+  const { domain, path, prefix } = parseTarget(reqUrl.pathname);
   const targetUrl = `https://${domain}${path}${reqUrl.search}`;
 
   const headers = new Headers();
@@ -184,6 +200,10 @@ export default async function handler(req) {
     const respHeaders = new Headers();
     respHeaders.set("access-control-allow-origin", "*");
     respHeaders.set("access-control-expose-headers", "*");
+
+    if (STATIC_PREFIXES.includes(prefix)) {
+      respHeaders.set("cache-control", "public, max-age=14400, immutable");
+    }
 
     for (const [key, value] of resp.headers.entries()) {
       if (SKIP_RES_HEADERS.has(key.toLowerCase())) continue;
