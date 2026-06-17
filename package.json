@@ -1,0 +1,9 @@
+{
+  "name": "github-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub proxy for regions with restricted access",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
