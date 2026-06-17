@@ -9,6 +9,9 @@ const PREFIX_TO_DOMAIN = {
   "~avatars": "avatars.githubusercontent.com",
   "~assets": "github.githubassets.com",
   "~gist-raw": "gist.githubusercontent.com",
+  "~collector": "collector.github.com",
+  "~alive": "alive.github.com",
+  "~edu": "education.github.com",
 };
 
 const DOMAIN_TO_PREFIX = {};
@@ -71,24 +74,35 @@ function parseTarget(pathname) {
 function rewriteUrls(text, proxyOrigin) {
   for (const domain of REPLACE_DOMAINS) {
     const prefix = DOMAIN_TO_PREFIX[domain];
-    const proxyBase = prefix
-      ? `${proxyOrigin}/${prefix}`
-      : proxyOrigin;
+    const proxyBase = prefix ? `${proxyOrigin}/${prefix}` : proxyOrigin;
 
     text = text.replaceAll(`https://${domain}`, proxyBase);
     text = text.replaceAll(`http://${domain}`, proxyBase);
-    text = text.replaceAll(`//${domain}`, `//${proxyBase.replace(/^https?:\/\//, "")}`);
+    text = text.replaceAll(
+      `//${domain}`,
+      `//${proxyBase.replace(/^https?:\/\//, "")}`
+    );
   }
   return text;
+}
+
+function cleanHtml(html) {
+  html = html.replace(
+    /<script[^>]*src=["'][^"']*static\.cloudflareinsights\.com[^"']*["'][^>]*><\/script>/gi,
+    ""
+  );
+  html = html.replace(
+    /<script[^>]*>[\s\S]*?cloudflareinsights[\s\S]*?<\/script>/gi,
+    ""
+  );
+  return html;
 }
 
 function rewriteLocationHeader(location, proxyOrigin) {
   if (!location) return location;
   for (const domain of REPLACE_DOMAINS) {
     const prefix = DOMAIN_TO_PREFIX[domain];
-    const proxyBase = prefix
-      ? `${proxyOrigin}/${prefix}`
-      : proxyOrigin;
+    const proxyBase = prefix ? `${proxyOrigin}/${prefix}` : proxyOrigin;
     location = location.replaceAll(`https://${domain}`, proxyBase);
     location = location.replaceAll(`http://${domain}`, proxyBase);
   }
@@ -103,13 +117,16 @@ function rewriteSetCookie(cookie) {
 
 function isTextContent(contentType) {
   if (!contentType) return false;
+  const ct = contentType.toLowerCase();
   return (
-    contentType.includes("text/") ||
-    contentType.includes("application/json") ||
-    contentType.includes("application/javascript") ||
-    contentType.includes("application/x-javascript") ||
-    contentType.includes("application/xml") ||
-    contentType.includes("image/svg+xml")
+    ct.includes("text/") ||
+    ct.includes("application/json") ||
+    ct.includes("application/javascript") ||
+    ct.includes("application/x-javascript") ||
+    ct.includes("application/xml") ||
+    ct.includes("image/svg+xml") ||
+    ct.includes("+json") ||
+    ct.includes("+xml")
   );
 }
 
@@ -119,7 +136,8 @@ export default async function handler(req) {
       status: 204,
       headers: {
         "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "access-control-allow-methods":
+          "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "access-control-allow-headers": "*",
         "access-control-max-age": "86400",
       },
@@ -184,9 +202,14 @@ export default async function handler(req) {
     const contentType = resp.headers.get("content-type") || "";
 
     if (isTextContent(contentType)) {
-      const text = await resp.text();
-      const rewritten = rewriteUrls(text, proxyOrigin);
-      return new Response(rewritten, { status, headers: respHeaders });
+      let text = await resp.text();
+      text = rewriteUrls(text, proxyOrigin);
+
+      if (contentType.includes("text/html")) {
+        text = cleanHtml(text);
+      }
+
+      return new Response(text, { status, headers: respHeaders });
     }
 
     return new Response(resp.body, { status, headers: respHeaders });
