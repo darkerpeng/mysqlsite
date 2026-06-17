@@ -72,17 +72,24 @@ function parseTarget(pathname) {
 }
 
 function rewriteUrls(text, proxyOrigin) {
+  const proxyHost = proxyOrigin.replace(/^https?:\/\//, "");
+
   for (const domain of REPLACE_DOMAINS) {
     const prefix = DOMAIN_TO_PREFIX[domain];
     const proxyBase = prefix ? `${proxyOrigin}/${prefix}` : proxyOrigin;
+    const proxyPath = prefix ? `${proxyHost}/${prefix}` : proxyHost;
 
     text = text.replaceAll(`https://${domain}`, proxyBase);
     text = text.replaceAll(`http://${domain}`, proxyBase);
-    text = text.replaceAll(
-      `//${domain}`,
-      `//${proxyBase.replace(/^https?:\/\//, "")}`
-    );
+    text = text.replaceAll(`//${domain}`, `//${proxyPath}`);
   }
+
+  for (const domain of REPLACE_DOMAINS) {
+    const prefix = DOMAIN_TO_PREFIX[domain];
+    const proxyPath = prefix ? `${proxyHost}/${prefix}` : proxyHost;
+    text = text.replaceAll(domain, proxyPath);
+  }
+
   return text;
 }
 
